@@ -1,0 +1,718 @@
+---
+title: "coding advent"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+library(stringr)
+```
+
+
+##Day 1
+A. Find two numbers in the file that summed give 2020 and print their product.
+```{r}
+numbers <- read.delim("advent_day1.txt", stringsAsFactors = F, header=F)
+numbers <- as.numeric(numbers$V1)
+
+for (i in 1:length(numbers))
+{
+  difference=2020-numbers[i]
+  if (length(which(numbers==difference)>0))
+  {
+    print(paste("a is ", numbers[i]))
+    print(paste("b is ", difference))
+    print(paste("product is ", numbers[i]*difference))
+  }
+}
+```
+B. Find three numbers in the file that summed give 2020 and print their product.
+```{r}
+for (i in 1:length(numbers))
+{
+  difference1=2020-numbers[i]
+  for (j in 1:length(numbers)-1)
+  {
+    new_numbers=numbers[-i]
+    difference2=difference1-new_numbers[j]
+    if (length(which(new_numbers==difference2)>0))
+    {
+      print(paste("a is ", numbers[i]))
+      print(paste("b is ", new_numbers[j]))
+      print(paste("c is ", difference2))
+      print(paste("product is ", numbers[i]*difference2*new_numbers[j]))
+    }
+  }
+}
+```
+##Day 2
+```{r}
+#read in data
+pass_data <- read.delim("advent_day2.txt", stringsAsFactors = F, header=F, sep=" ")
+names(pass_data) <- c("interval", "char", "password")
+
+#separate range into columns
+pass_data <- tidyr::separate(pass_data, col="interval", into=c("min", "max"), sep="-", remove=T)
+pass_data$min = as.numeric(pass_data$min)
+pass_data$max = as.numeric(pass_data$max)
+
+#remove : from char column
+pass_data$char <- gsub(pass_data$char, pattern=":", replacement="")
+
+#count the lines that fit the rule
+correct=0
+for (i in 1:nrow(pass_data))
+{
+  count <- str_count(pass_data$password[i], pass_data$char[i])
+  #print(paste("count is ",count))
+  if(count <= pass_data$max[i] && count >= pass_data$min[i])
+    {
+    correct=correct+1
+  }
+}
+```
+
+```{r}
+#count the lines that fit the rule
+correct=0
+for (i in 1:nrow(pass_data))
+{
+  #break password into individual letters
+  vect_pass <- unlist(strsplit(pass_data$password[i], split = ""))
+  #subset the two characters occupied by positions min and max
+  chars <- paste0(vect_pass[pass_data$min[i]], vect_pass[pass_data$max[i]])
+  #count how many times it appears at named positions
+  count <- str_count(chars, pass_data$char[i])
+  #print(paste("count is ",count))
+  if(count==1)
+    {
+    correct=correct+1
+    }
+}
+```
+
+##Day 3
+```{r}
+#make the slope wide enough to travel (about 1000 times the length of the slope)
+slope <- read.delim("advent_day3.txt", stringsAsFactors = F, header=F, sep=" ")
+for (i in 1:nrow(slope))
+{
+  slope$V1[i] <- paste(replicate(1000*nrow(slope), slope$V1[i]), collapse = "")
+}
+
+# navigate and count
+vect_grab <- c()
+index = 1
+for(i in 2:nrow(slope))
+{
+  #navigate 3 paces - update index
+  index=index+3
+  #separate and unlist row so that indeces can be used
+  vect_row <- unlist(strsplit(slope$V1[i], split = ""))
+  #grab the value on the line below at the updated index
+  vect_grab <- c(vect_grab, vect_row[index])
+}
+
+#print how many trees
+length(which(vect_grab=="#"))
+```
+
+```{r}
+# navigate and count
+trees_count <- function(right, down)
+{
+  vect_grab <- c()
+  index = 1
+  #seq start 2 for down 1, 3 for down 2
+  for(i in seq(3, nrow(slope), down))
+    {
+      #navigate 3 paces - update index
+      index=index+right
+      #separate and unlist row so that indeces can be used
+      vect_row <- unlist(strsplit(slope$V1[i], split = ""))
+      #grab the value on the line below at the updated index
+      vect_grab <- c(vect_grab, vect_row[index])
+    }
+  print(vect_grab)
+  #print how many trees
+  print(length(which(vect_grab=="#")))
+}
+
+trees_count(1, 2)
+trees_count(1, 1)
+trees_count(7, 1)
+trees_count(5, 1)
+trees_count(3, 1)
+
+66*73*85*35*272
+```
+
+##Day 4
+Need to split the input file into separate files (one for each passport) based on white lines. Do with awk, make sure to close file at each iteration, and remove the DOS <CR> line terminators first.
+```{bash}
+tr -d '\r' < /Users/dbogdan/analysis/WORKDIR/Advent_2020/advent_day4.txt | awk 'BEGIN{i=0}{RS="";}{close("F"i);x="F"++i;}{print > x;}'
+```
+
+```{r}
+#read in the docs and parse to list
+file_list <- list.files(path="./sep/")
+data_list <- list()
+for (i in 1:length(file_list))
+{
+  data_list[[i]] <- read.delim(paste0("./sep/", file_list[[i]]), header=F, sep="\n")
+}
+
+#for each doc in the list, count how many fields there are and whether they have a cid field
+fields <- c()
+cid <- c()
+for (i in 1:length(data_list))
+{
+  count <- 0
+  cid_count <- 0
+  doc <- data_list[[i]]
+  for (j in 1:nrow(doc))
+  {
+    string <- doc$V1[j]
+    count <- count + str_count(string, ":")
+    cid_count <- cid_count + str_count(string, "cid")
+  }
+  fields <- c(fields, count)
+  cid <- c(cid, cid_count)
+}
+
+summary_passports <- data.frame(n_fields=fields, country=cid)
+valid <-0 
+pos_valid <- c()
+for (i in 1:nrow(summary_passports))
+{
+  #count if valid, also save position
+  if (summary_passports$n_fields[i]==8)
+  {
+    valid <- valid+1
+    pos_valid <- c(pos_valid, i)
+  }
+  else 
+    if(summary_passports$n_fields[i]==7 && summary_passports$country[i]==0)
+      {
+      valid <- valid+1
+      pos_valid <- c(pos_valid, i)
+    }
+    
+}
+```
+
+```{r}
+#use only valid docs from now
+valid_list <- data_list[pos_valid]
+
+#acceptable values
+byr_c <- c(1920, 2002)
+iyr_c <- c(2010, 2020)
+eyr_c <- c(2020, 2030)
+hgt_cm <- c(150, 193)
+hgt_in <- c(59, 76)
+ecl_p <- c("amb", "blu", "brn", "gry", "grn", "hzl", "oth")
+```
+
+```{r}
+#organise data into a data frame that makes sense
+byr_v <- c()
+iyr_v <- c()
+eyr_v <- c()
+hgt_v <- c()
+ecl_v <- c()
+hcl_v <- c()
+pid_v <-c()
+for (i in 1:length(valid_list))
+{
+  doc <- valid_list[[i]]
+  doc_string <- c("")
+  for (j in 1:nrow(doc))
+  {
+    doc_string <- paste(doc_string, doc$V1[j])
+  }
+  #split into different strings for each attribute, then for each value
+  doc_string <- str_split(doc_string, " ")
+  att <- c()
+  for (n in 1:length(doc_string[[1]]))
+  {
+    att <- c(att, str_split(doc_string[[1]][n], ":")[[1]][1], 
+             str_split(doc_string[[1]][n], ":")[[1]][2])
+    
+  }
+  #find the 7 attributes and grab the values 
+  byr_v <- c(byr_v, att[[which(att=="byr")+1]])
+  iyr_v <- c(iyr_v, att[[which(att=="iyr")+1]])
+  eyr_v <- c(eyr_v, att[[which(att=="eyr")+1]])
+  hgt_v <- c(hgt_v, att[[which(att=="hgt")+1]])
+  ecl_v <- c(ecl_v, att[[which(att=="ecl")+1]])
+  hcl_v <- c(hcl_v, att[[which(att=="hcl")+1]])
+  pid_v <-c(pid_v, att[[which(att=="pid")+1]])
+}
+
+#make data frame
+all_entries <- data.frame(byr=byr_v, iyr=iyr_v, eyr=eyr_v, hgt=hgt_v, ecl=ecl_v, hcl=hcl_v, pid=pid_v)
+
+checked <- all_entries %>% dplyr::filter(byr >= byr_c[1] & byr <= byr_c[2]) %>% dplyr::filter(iyr >= iyr_c[1] & iyr <= iyr_c[2]) %>% dplyr::filter(eyr >= eyr_c[1] & eyr <= eyr_c[2])
+
+checked <- checked[grep("#", checked$hcl),]
+checked$hcl <- gsub("#", "", checked$hcl)
+#check if there are any that do not fit the 6 digit rule
+which(str_length(checked$hcl)!=6)
+
+#exclude any non-9 digit pid numbers
+checked <- checked[-which(str_length(checked$pid)!=9),]
+
+#deal with eye colour
+indeces <- c()
+for (i in 1:length(checked$ecl))
+{
+  if(length(setdiff(ecl_p, checked$ecl[i]))<7)
+  {
+    indeces <- c(indeces, i)
+  }
+}
+
+checked <-checked[indeces,]
+
+#deal with height
+numbers <- gsub("[^[:digit:]]","",checked$hgt)
+unit <- gsub("[[:digit:]]","", checked$hgt)
+fin <- 0
+
+#loop and count matches
+for (i in 1:length(numbers))
+{
+  if (unit[i]=="cm")
+  {
+    if (numbers[i]>=hgt_cm[1] & numbers[i]<=hgt_cm[2])
+    {
+      fin=fin+1
+    }
+  }
+  else 
+  {
+    if (numbers[i]>=hgt_in[1] & numbers[i]<=hgt_in[2])
+    {
+      fin=fin+1
+    }
+  }
+}
+```
+
+##Day 5.
+```{r}
+seats <- read.delim("advent_day5.txt", header=F, sep="\n")
+rs=128
+cs=8
+
+all_ids <- c()
+row_ids <- c()
+col_ids <- c()
+for (seat in  1:nrow(seats))
+{
+  s=seats$V1[seat]
+  all_ids <- c(all_ids, seat_id(s)[3])
+  row_ids <- c(row_ids, seat_id(s)[1])
+  col_ids <- c(col_ids, seat_id(s)[2])
+}
+
+
+#write function that calculates seat ids
+seat_id <- function(s)
+{
+  #split string to be able to access individual positions
+  s=str_split(s, "")[[1]]
+  #initialise up and down boundaries of interval to be halved
+  dn=0
+  up=rs
+  #initialise the row position to be updated
+  fin_r=rs/2
+  i=1
+  #deal with the row
+  while (length(s)>3)
+  {
+    if (s[i]=="F")
+      {
+        up <- fin_r
+        dn <- dn
+        fin_r <- dn + floor((up-dn)/2)
+      }
+    else 
+      {
+        up <- up
+        dn <- fin_r
+        fin_r <- dn + floor((up-dn)/2) 
+      }
+    #cut the letter from vect
+    s=s[2:length(s)]
+  }
+  
+  #deal with the column -same procedure
+  dn=0
+  up=cs
+  fin_c=cs/2
+  for (i in 1:3)
+  {
+    if (s[i]=="L")
+      {
+        up <- fin_c
+        dn <- dn
+        fin_c <- dn + floor((up-dn)/2)
+      } 
+    else 
+      {
+        up <- up
+        dn <- fin_c
+        fin_c <- dn + floor((up-dn)/2) 
+      }
+  }
+  #calculate seat id
+  id <- fin_r*8 + fin_c
+  #return vector with ids found
+  return(c(fin_r, fin_c, id))
+}
+```
+
+```{r}
+#put rows and columns in data frame
+x = data.frame(row=row_ids, col=col_ids)
+x = x[order(x$row),]
+#collapse into counts for each row
+x1 <- x %>% dplyr::group_by(row) %>% dplyr::summarise(seats = paste(row, collapse=", "), times = length(row)) 
+x1 = x1[order(x1$row),]
+#find my seat
+which(x1$times<8)
+```
+
+##Day 6
+Collapse master file so that each group has its own line.
+```{bash}
+awk -v RS= '$1=$1' advent_day6.txt > day6_collapsed.txt
+```
+
+Count questions ANYONE answered yes (unique letters).
+```{r}
+data_list <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/day6_collapsed.txt", sep="\n", header=F)
+
+all_counts <- c()
+for (i in 1:nrow(data_list))
+{
+  count <- sum(!!str_count(data_list$V1[i], letters))
+  all_counts <- c(all_counts, count)
+}
+
+sum(all_counts)
+```
+
+Count questions EVERYONE answered yes (intersect strings within each line).
+```{r}
+all_counts <- c()
+for (i in 1:nrow(data_list))
+{
+  row <- str_split(data_list$V1[i], " ")[[1]]
+  count <- length(Reduce(intersect, strsplit(row,"")))
+  all_counts <- c(all_counts, count)
+}
+
+sum(all_counts)
+```
+
+##Day 7
+Tidy up the data file in sed before importing to R
+```{bash eval=FALSE}
+cat advent_day7.txt | sed 's/ contain/,/g' | sed 's/ bags//g' | sed 's/\.//g' > fin.txt
+```
+
+```{bash eval=FALSE}
+#increase R memory - not a permanent change
+ulimit -s 16384 # enlarge stack limit to 16 megs
+
+#check R memory
+R --slave -e 'Cstack_info()["size"]'
+```
+
+This code needs to be run in a separate R session, after the memory requirement has been expanded from the command line as above.
+```{r eval=FALSE}
+#read individual lines from data
+bags_data <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/fin.txt", header = FALSE, sep = "\n")
+split_data <- c()
+for (i in 1:nrow(bags_data))
+{
+  row <- str_split(bags_data$V1[i],"\\,",n=2)
+  split_data <- rbind(split_data, row[[1]])
+}
+
+row.names(split_data) <- split_data[,1]
+split_data <- split_data[,2]
+
+
+f_recursion <- function(colour, split_data)
+{
+  subset <- split_data[grep(split_data, pattern = colour)]
+  if (length(subset)>0)
+  {
+      for (i in 1:length(subset))
+        {
+        colour <- names(subset[i])
+        print(colour)
+        f_recursion(colour, split_data)
+        }
+  }
+}
+
+colour <- "shiny gold"
+f_recursion(colour, split_data)
+```
+
+The recursive function will print a list of colours to the console. Save this list to a file then load it in here to find the unique colours:
+```{r}
+unique_cols <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/7_part1_interim.txt", sep=" ", header=F)
+length(unique(unique_cols$V2))
+```
+
+Part 2.
+```{r}
+f_recursion_2 <- function(colour, n)
+{
+  subset <- split_data[colour]
+  if (subset[1]==" no other")
+      print(paste(colour, n))
+  else
+  {
+      split_string <- str_split(subset[1], ",")[[1]]
+      numbers <- as.numeric(gsub(".*?([0-9]+).*", "\\1", split_string))
+      sum <- n*sum(numbers) + n
+      print(numbers)
+      print(paste(colour, sum))
+      if (length(split_string)>0)
+      {
+        for (i in 1:length(split_string))
+        {
+          colour <- substring(str_split(split_string, pattern=",")[[i]], 4)
+          n <- numbers[i]
+          f_recursion_2(colour, n)
+        }
+      }
+  }
+}
+
+
+f_recursion_2(colour, 1)
+```
+
+```{r}
+unique_cols <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/7_part2_interim.txt", sep=" ", header=F)
+bags_to_sum <- unique(unique_cols$V2)
+counts <- as.numeric(gsub(".*?([0-9]+).*", "\\1", bags_to_sum))
+sum(counts)
+```
+
+##Day 8
+VM problem -come back to this and make it nice because likely to come back and bite you in the ass
+```{r}
+loop <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/advent_day8.txt", header = FALSE, sep = " ")
+loop_vect <- loop$V2
+loop_vect <- as.numeric(loop_vect)
+names(loop_vect) <- loop$V1
+
+next_pos=1
+this_pos=1
+a=0
+while (loop_vect[next_pos] < 1000004)
+{
+  this_pos <- next_pos
+  if (names(loop_vect)[this_pos]=="nop")
+    {
+    loop_vect[this_pos] <- 1000000
+    next_pos=this_pos+1
+    }
+  else
+  {
+    if (names(loop_vect)[this_pos]=="acc")
+    {
+      a=a+loop_vect[this_pos]
+      loop_vect[this_pos] <- 1000000
+      next_pos=this_pos+1
+    }
+    else
+    {
+      x=loop_vect[this_pos]
+      loop_vect[this_pos] <- 1000000
+      next_pos=as.numeric(x)+this_pos
+    }
+  }
+}
+
+##Answer 1
+a
+```
+
+Part 2.
+```{r}
+find_a <- function(loop_vect)
+{
+  next_pos=1
+  this_pos=1
+  a=0
+  repeat
+  {
+    this_pos <- next_pos
+    if (names(loop_vect)[this_pos]=="nop")
+      {
+      loop_vect[this_pos] <- 1000000
+      next_pos=this_pos+1
+      }
+    else
+    {
+      if (names(loop_vect)[this_pos]=="acc")
+      {
+        a=a+loop_vect[this_pos]
+        loop_vect[this_pos] <- 1000000
+        next_pos=this_pos+1
+      }
+    else
+    {
+      x=loop_vect[this_pos]
+      loop_vect[this_pos] <- 1000000
+      next_pos=as.numeric(x)+this_pos
+    }
+  }
+  if (next_pos > length(loop_vect)+1)
+    break;
+}
+
+return(a)
+}
+
+#prepare data in named vector
+loop_vect <- loop$V2
+loop_vect <- as.numeric(loop_vect)
+names(loop_vect) <- loop$V1
+
+##this loop will get stuck on the right substitution because names(loop_vect)[this pos]
+##in the find_a function will be undefined
+
+##running this code will result in the right new_loop_vect that terminated normally
+for (i in 1:length(loop_vect))
+{
+  if (names(loop_vect)[i]=="nop")
+  {
+    new_loop_vect <- loop_vect
+    names(new_loop_vect)[i] <- "jmp"
+    a = find_a(new_loop_vect)
+  }
+  else
+  {
+    if (names(loop_vect)[i]=="jmp")
+    {
+    new_loop_vect <- loop_vect
+    names(new_loop_vect)[i] <- "nop"
+    a = find_a(new_loop_vect)
+    }
+  }
+}
+
+```
+
+```{r}
+#finally, run the finding a algorithm on the new loop vect, substituted at the i position
+  loop_vect <- new_loop_vect
+  next_pos=1
+  this_pos=1
+  a=0
+  repeat
+  {
+    this_pos <- next_pos
+    if (names(loop_vect)[this_pos]=="nop")
+      {
+      loop_vect[this_pos] <- 1000000
+      next_pos=this_pos+1
+      }
+    else
+    {
+      if (names(loop_vect)[this_pos]=="acc")
+      {
+        a=a+loop_vect[this_pos]
+        loop_vect[this_pos] <- 1000000
+        next_pos=this_pos+1
+      }
+    else
+    {
+      x=loop_vect[this_pos]
+      loop_vect[this_pos] <- 1000000
+      next_pos=as.numeric(x)+this_pos
+    }
+  }
+  if (next_pos > length(loop_vect)+1)
+    break;
+  }
+#Answer 2
+a
+```
+
+##Day 9
+```{r}
+code <- read.delim("/Users/dbogdan/analysis/WORKDIR/Advent_2020/advent_day9.txt", header = FALSE, sep = "\n")
+code <- as.numeric(code$V1)
+
+i=26
+pass=TRUE
+while (pass==TRUE)
+{
+  previous <- code[(i-25):(i-1)]
+  for (j in 1:length(previous))
+  {
+    value = abs(previous[j]-code[i])
+    if(length(which(previous==value))>0)
+    {
+      pass=TRUE
+      break;
+    }
+    else
+    {
+      pass=FALSE
+    }
+  }
+  i=i+1
+}
+
+##Answer 1
+code[i-1]
+```
+
+Part 2
+```{r}
+target=code[i-1]
+pass=TRUE
+i=1
+while (pass==TRUE)
+{
+  sum=0
+  for (j in i:length(code))
+  {
+    sum=sum+code[j]
+    if (sum==target)
+    {
+      pass=FALSE
+      break;
+    }
+    else
+    {
+      if (sum > target)
+      {
+        pass=TRUE
+        break;
+      }
+    }
+  }
+  i=i+1
+}
+
+#check the sum is right
+sum(code[(i-1):j])==target
+
+##Answer 2
+min(code[(i-1):j])+max(code[(i-2):j])
+```
+
